@@ -10,6 +10,7 @@ import * as graphVideo from './instagram/GraphVideo';
 import { AttachmentBuilder, WebhookClient } from 'discord.js';
 import { env } from './env';
 import * as owner from './instagram/generic/owner';
+import { upload } from './test';
 
 @Injectable()
 export class AppService {
@@ -34,9 +35,11 @@ export class AppService {
           data: { shortcode_media: GraphSidecar | GraphImage | GraphVideo }
         }>)
       .then(json => json.data.shortcode_media);
-    await this.#handleAuthor(data);
-    await this.#handleAttachment(data);
-    await this.#handlePost(data);
+    await Promise.all([
+      this.#handleAuthor(data),
+      this.#handleAttachment(data),
+      this.#handlePost(data),
+    ])
   }
 
   async #handlePost(post: GraphSidecar | GraphImage | GraphVideo) {
@@ -193,7 +196,7 @@ export class AppService {
     const attachments = post.__typename !== 'GraphSidecar'
       ? [post]
       : post.edge_sidecar_to_children.edges.map(edge => edge.node);
-    for (const attachment of attachments) {
+    const promises = attachments.map(async attachment => {
       if (attachment.__typename === 'GraphImage')
         await this.#ensureAttachmentExists({
           id: graphImage.getPostId(attachment),
@@ -209,7 +212,8 @@ export class AppService {
           imageUrl: graphVideo.getPostImageUrl(attachment),
           videoUrl: graphVideo.getPostVideoUrl(attachment),
         });
-    }
+    });
+    await Promise.all(promises);
   }
 
   async #ensureAttachmentExists(
@@ -227,38 +231,42 @@ export class AppService {
     }).then(res => !!res);
     if (exists)
       return;
+    const [imageUrl, videoUrl] = await Promise.all([
+      this.#uploadFile(
+        attachment.imageUrl,
+        attachment.imageUrl.replace(/^[^]*\//, '').replace(/\?[^]*$/, '')
+      ),
+      !attachment.videoUrl
+        ? undefined
+        : this.#uploadFile(
+          attachment.videoUrl,
+          attachment.videoUrl.replace(/^[^]*\//, '').replace(/\?[^]*$/, ''),
+        ),
+    ]);
     await this.prisma.attachment.create({
       data: {
         id: attachment.id,
         height: attachment.height,
         width: attachment.width,
-        imageUrl: await this.#uploadFile(
-          attachment.imageUrl,
-          attachment.imageUrl.replace(/^[^]*\//, '').replace(/\?[^]*$/, '')
-        ),
-        videoUrl: !attachment.videoUrl
-          ? undefined
-          : await this.#uploadFile(
-            attachment.videoUrl,
-            attachment.videoUrl.replace(/^[^]*\//, '').replace(/\?[^]*$/, '')
-          ),
+        imageUrl: imageUrl,
+        videoUrl: videoUrl,
       }
     })
   }
 
-  async #uploadFile(url: string, name: string, headers?: Record<string, string>) {
+  async #uploadFile(url: string, filename: string, headers?: Record<string, string>) {
     const {
       body,
       statusCode,
+      headers: receivedHeaders,
     } = await request(url, { headers });
     if (statusCode !== 200)
       throw new Error(`Got statusCode: ${statusCode}, not proceeding`);
-    const msg = await this.webhook.send({
-      files: [
-        new AttachmentBuilder(body, { name }),
-      ],
-    });
-    return msg.attachments.at(0)!.url;
+    const size = +<string>receivedHeaders['content-length'];
+    if (Number.isNaN(size))
+      throw new Error(`Undefined size`);
+    const attachment = await upload(body, filename, size);
+    return attachment.url;
   }
 
 }

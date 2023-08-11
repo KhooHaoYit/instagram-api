@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PrismaService } from 'nestjs-prisma';
-import { Attachment, Post } from '@prisma/client';
 
 @Controller()
 export class AppController {
@@ -29,13 +28,19 @@ export class AppController {
       include: {
         author: !!includeAuthor
       },
-    })!;
-    const attachments = includeAttachment && post
+    });
+    if (!post)
+      return JSON.stringify(null);
+    const attachments = includeAttachment
       ? await this.prisma.attachment.findMany({
         where: {
           id: { in: post.attachmentIds },
         }
-      })
+      }).then(attachments =>
+        Object.fromEntries(
+          attachments.map(attachment => [attachment.id, attachment])
+        )
+      )
       : undefined;
     return JSON.stringify({
       ...post,
