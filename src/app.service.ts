@@ -7,10 +7,10 @@ import { GraphImage } from './instagram/GraphImage';
 import * as graphImage from './instagram/GraphImage';
 import { GraphVideo } from './instagram/GraphVideo';
 import * as graphVideo from './instagram/GraphVideo';
-import { AttachmentBuilder, WebhookClient } from 'discord.js';
+import { WebhookClient } from 'discord.js';
 import { env } from './env';
 import * as owner from './instagram/generic/owner';
-import { upload } from './test';
+import { upload } from './attachmentUploader';
 
 @Injectable()
 export class AppService {

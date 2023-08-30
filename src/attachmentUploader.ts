@@ -1,15 +1,14 @@
-import { APIAttachment, Attachment, AttachmentBuilder, WebhookClient } from "discord.js";
-import { Stream, Writable, WritableOptions } from "stream";
+import {
+  APIAttachment,
+  AttachmentBuilder,
+  WebhookClient,
+} from "discord.js";
+import {
+  Stream,
+  Writable,
+  WritableOptions,
+} from "stream";
 import { env } from "./env";
-
-Writable.prototype.writeAhead = function (chunk: any, encoding: any, cb?: any) {
-  const result = this.write(chunk, encoding, cb) === true;
-  const buffer: unknown[] = (<any>this)._writableState.buffered;
-  const writtenChunk = buffer.pop();
-  if (writtenChunk)
-    buffer.unshift(writtenChunk);
-  return result;
-}
 
 class AttachmentUploader<T extends {
   rs: (value: APIAttachment) => void
@@ -99,7 +98,12 @@ class AttachmentUploader<T extends {
   writeAhead(chunk: T, encoding?: BufferEncoding | undefined, cb?: ((error: Error | null | undefined) => void) | undefined): boolean;
   writeAhead(chunk: T, cb?: ((error: Error | null | undefined) => void) | undefined): boolean;
   writeAhead(chunk: any, encoding?: any, cb?: any): boolean {
-    return super.writeAhead(chunk, encoding, cb);
+    const result = this.write(chunk, encoding, cb) === true;
+    const buffer: unknown[] = (<any>this)._writableState.buffered;
+    const writtenChunk = buffer.pop();
+    if (writtenChunk)
+      buffer.unshift(writtenChunk);
+    return result;
   }
 
 }

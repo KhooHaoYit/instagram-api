@@ -20,10 +20,6 @@
     "strict": true,
     "lib": [
       "es2022"
-    ],
-    "typeRoots": [
-      "./node_modules/@types",
-      "./src/types"
     ]
   }
 }

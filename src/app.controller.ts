@@ -20,8 +20,8 @@ export class AppController {
     @Param('id') id: string,
     @Query() {
       includeAuthor,
-      includeAttachment,
-    }: Record<'includeAuthor' | 'includeAttachment', string>,
+      includeAttachments,
+    }: Record<'includeAuthor' | 'includeAttachments', string>,
   ) {
     const post = await this.prisma.post.findFirst({
       where: { shortcode: id },
@@ -31,7 +31,7 @@ export class AppController {
     });
     if (!post)
       return JSON.stringify(null);
-    const attachments = includeAttachment
+    const attachments = includeAttachments
       ? await this.prisma.attachment.findMany({
         where: {
           id: { in: post.attachmentIds },
@@ -51,7 +51,7 @@ export class AppController {
   @HttpPost('/shortcodes/:id/fetch')
   async fetchShortcode(
     @Param('id') id: string,
-    @Query() includes: Record<'includeAuthor' | 'includeAttachment', string>,
+    @Query() includes: Record<'includeAuthor' | 'includeAttachments', string>,
   ) {
     await this.appService.scrapePost(id);
     return await this.getShortcode(id, includes);
