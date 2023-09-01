@@ -29,11 +29,17 @@ export class AppService {
         has_threaded_comments: true,
       })
     );
-    const data = await request(`https://www.instagram.com/graphql/query/?query_hash=b3055c01b4b222b8a47dc12b090e4e64&variables=${variables}`)
-      .then(res =>
-        res.body.json() as Promise<{
-          data: { shortcode_media: GraphSidecar | GraphImage | GraphVideo }
-        }>)
+    const data = await request(
+      `https://www.instagram.com/graphql/query/?query_hash=b3055c01b4b222b8a47dc12b090e4e64&variables=${variables}`,
+      {
+        headers: {
+          cookie: env.INSTAGRAM_COOKIE,
+        },
+      },
+    ).then(res =>
+      res.body.json() as Promise<{
+        data: { shortcode_media: GraphSidecar | GraphImage | GraphVideo }
+      }>)
       .then(json => json.data.shortcode_media);
     await Promise.all([
       this.#handleAuthor(data),
