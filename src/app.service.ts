@@ -11,41 +11,45 @@ import { WebhookClient } from 'discord.js';
 import { env } from './env';
 import * as owner from './instagram/generic/owner';
 import { upload } from './attachmentUploader';
+import { fetchPost } from './instagram';
+import { Agent } from 'https';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 @Injectable()
 export class AppService {
   webhook = new WebhookClient({
     url: env.DISCORD_WEBHOOK_URL,
   });
+  agents: (Agent | undefined)[] = [];
 
   constructor(
     private prisma: PrismaService,
-  ) { }
+  ) {
+    this.agents.push(undefined);
+    for (const url of env.HTTPS_PROXY_AGENT_URLS)
+      this.agents.push(new HttpsProxyAgent(url));
+  }
 
   async scrapePost(shortcode: string) {
-    const variables = encodeURIComponent(
-      JSON.stringify({
-        shortcode,
-        has_threaded_comments: true,
-      })
-    );
-    const data = await request(
-      `https://www.instagram.com/graphql/query/?query_hash=b3055c01b4b222b8a47dc12b090e4e64&variables=${variables}`,
-      {
-        headers: {
-          cookie: env.INSTAGRAM_COOKIE,
-        },
-      },
-    ).then(res =>
-      res.body.json() as Promise<{
-        data: { shortcode_media: GraphSidecar | GraphImage | GraphVideo }
-      }>)
-      .then(json => json.data.shortcode_media);
-    await Promise.all([
-      this.#handleAuthor(data),
-      this.#handleAttachment(data),
-      this.#handlePost(data),
-    ])
+    for (let retry = 3; retry; --retry) {
+      const result = await fetchPost(shortcode, this.#getAgent());
+      if (result.status !== 'ok')
+        continue;
+      const data = result.data.shortcode_media;
+      await Promise.all([
+        this.#handleAuthor(data),
+        this.#handleAttachment(data),
+        this.#handlePost(data),
+      ]);
+      return;
+    }
+    throw new Error('Unable to fetch post');
+  }
+
+  #getAgent() {
+    const currentAgent = this.agents.shift();
+    this.agents.push(currentAgent);
+    return currentAgent;
   }
 
   async #handlePost(post: GraphSidecar | GraphImage | GraphVideo) {
@@ -80,9 +84,10 @@ export class AppService {
           description: graphVideo.getDescription(post) ?? '',
           shortcode: graphVideo.getShortcode(post),
         });
-      case 'GraphSidecar':
-        return await this.#ensurePostUpdated({
-          id: graphSidecar.getPostId(post),
+      case 'GraphSidecar': {
+        const postInfo = graphSidecar.getPostInfo(post);
+        await this.#ensurePostUpdated({
+          id: postInfo.id,
           attachmentIds: graphSidecar.getAttachmentsRaw(post)
             .map(({ node }) => {
               switch (node.__typename) {
@@ -97,11 +102,12 @@ export class AppService {
           authorId: owner.getUserId(
             graphSidecar.getAuthorRaw(post)
           ),
-          comments: graphSidecar.getPostComments(post),
-          likes: graphSidecar.getPostLikes(post),
-          description: graphSidecar.getPostDescription(post) ?? '',
-          shortcode: graphSidecar.getPostShortcode(post),
+          comments: postInfo.comments,
+          likes: postInfo.likes,
+          description: postInfo.description ?? '',
+          shortcode: postInfo.shortcode,
         });
+      } break;
     }
   }
 

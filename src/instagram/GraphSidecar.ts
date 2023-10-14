@@ -30,24 +30,14 @@ export type GraphSidecar = {
 
 
 
-export function getPostId(data: GraphSidecar) {
-  return data.id;
-}
-
-export function getPostShortcode(data: GraphSidecar) {
-  return data.shortcode;
-}
-
-export function getPostDescription(data: GraphSidecar) {
-  return data.edge_media_to_caption.edges.at(0)?.node.text;
-}
-
-export function getPostLikes(data: GraphSidecar) {
-  return data.edge_media_preview_like.count;
-}
-
-export function getPostComments(data: GraphSidecar) {
-  return data.edge_media_to_parent_comment.count;
+export function getPostInfo(data: GraphSidecar) {
+  return {
+    id: data.id,
+    shortcode: data.shortcode,
+    description: data.edge_media_to_caption.edges.at(0)?.node.text,
+    likes: data.edge_media_preview_like.count,
+    comments: data.edge_media_to_parent_comment.count,
+  };
 }
 
 export function getAttachmentsRaw(data: GraphSidecar) {
