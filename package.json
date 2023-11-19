@@ -41,7 +41,7 @@
     "rimraf": "^3.0.2",
     "rxjs": "^7.8.1",
     "undici": "^5.23.0",
-    "zod": "^3.21.4"
+    "zod": "^3.22.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^9.5.0",
