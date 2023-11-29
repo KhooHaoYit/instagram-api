@@ -12,22 +12,29 @@ import { env } from './env';
 import * as owner from './instagram/generic/owner';
 import { upload } from './attachmentUploader';
 import { fetchPost } from './instagram';
-import { Agent } from 'https';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 @Injectable()
 export class AppService {
   webhook = new WebhookClient({
     url: env.DISCORD_WEBHOOK_URL,
   });
-  agents: (Agent | undefined)[] = [];
+  agentUrls: string[] = structuredClone(env.HTTPS_PROXY_AGENT_URLS);
 
   constructor(
     private prisma: PrismaService,
   ) {
-    this.agents.push(undefined);
-    for (const url of env.HTTPS_PROXY_AGENT_URLS)
-      this.agents.push(new HttpsProxyAgent(url));
+    for (const agentUrl of this.agentUrls) {
+      const url = new URL(agentUrl);
+      switch (url.protocol) {
+        default:
+          throw new Error(`Unknown agent's protocol: ${url.href}`);
+        case 'http:':
+        case 'socks:':
+          break;
+      }
+    }
   }
 
   async scrapePost(shortcode: string) {
@@ -47,9 +54,25 @@ export class AppService {
   }
 
   #getAgent() {
-    const currentAgent = this.agents.shift();
-    this.agents.push(currentAgent);
-    return currentAgent;
+    const currentAgentUrl = this.agentUrls.shift();
+    if (!currentAgentUrl)
+      return;
+    this.agentUrls.push(currentAgentUrl);
+    const url = new URL(currentAgentUrl);
+    switch (url.protocol) {
+      default:
+        throw new Error(`Unknown agent's protocol: ${url.href}`);
+      case 'http:':
+        return new HttpsProxyAgent(url.href);
+      case 'socks:': {
+        if (url.searchParams.get('randomAuth')) {
+          url.searchParams.delete('randomAuth');
+          url.username = Math.floor(Math.random() * 1_000_000) + '';
+          url.password = Math.floor(Math.random() * 1_000_000) + '';
+        }
+        return new SocksProxyAgent(url.href);
+      } break;
+    }
   }
 
   async #handlePost(post: GraphSidecar | GraphImage | GraphVideo) {

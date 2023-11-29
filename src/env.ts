@@ -20,10 +20,11 @@ export const env = createEnv({
       .string()
       .optional()
       .transform(text => {
-        text = text?.trim();
-        if (!text)
-          return [];
-        return text.split('\n');
+        text ??= '';
+        return text
+          .split('\n')
+          .map(line => line.startsWith('#') ? '' : line)
+          .filter(line => line);
       }),
     // Sentry
     SENTRY_DSN: z.string().optional(),
