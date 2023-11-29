@@ -32,6 +32,7 @@ export class AppService {
           throw new Error(`Unknown agent's protocol: ${url.href}`);
         case 'http:':
         case 'socks:':
+        case 'socks5:':
           break;
       }
     }
@@ -64,7 +65,8 @@ export class AppService {
         throw new Error(`Unknown agent's protocol: ${url.href}`);
       case 'http:':
         return new HttpsProxyAgent(url.href);
-      case 'socks:': {
+      case 'socks:':
+      case 'socks5:': {
         if (url.searchParams.get('randomAuth')) {
           url.searchParams.delete('randomAuth');
           url.username = Math.floor(Math.random() * 1_000_000) + '';
