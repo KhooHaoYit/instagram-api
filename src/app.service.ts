@@ -39,10 +39,18 @@ export class AppService {
   }
 
   async scrapePost(shortcode: string) {
-    for (let retry = 3; retry; --retry) {
+    const startTime = Date.now()
+    for (
+      let retryCount = 0
+      ; Date.now() <= startTime + 30_000
+      || retryCount < 5
+      ; ++retryCount
+    ) {
       const result = await fetchPost(shortcode, this.#getAgent());
-      if (result.status !== 'ok')
+      if (result.status !== 'ok') {
+        console.warn(`Failed to fetch ${shortcode}, amount: ${retryCount}, since: ${Date.now() - startTime}ms`);
         continue;
+      }
       const data = result.data.shortcode_media;
       await Promise.all([
         this.#handleAuthor(data),
