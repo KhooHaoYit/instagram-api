@@ -1,7 +1,8 @@
 ARG PNPM_VERSION=8.3.1
 
 FROM node:18-alpine AS BUILDER
-RUN npm i -g pnpm@$PNPM_VERSION
+ARG PNPM_VERSION
+RUN apk add --no-cache openssl && npm i -g pnpm@$PNPM_VERSION
 WORKDIR /app
 COPY pnpm-lock.yaml ./
 RUN pnpm fetch
@@ -14,7 +15,8 @@ COPY . .
 RUN npm run build
 
 FROM node:18-alpine AS PRODUCTION_PACKAGE
-RUN npm i -g pnpm@$PNPM_VERSION
+ARG PNPM_VERSION
+RUN apk add --no-cache openssl && npm i -g pnpm@$PNPM_VERSION
 WORKDIR /app
 COPY pnpm-lock.yaml ./
 RUN pnpm fetch --prod
@@ -24,6 +26,7 @@ COPY prisma/schema.prisma prisma/schema.prisma
 RUN npx prisma generate
 
 FROM node:18-alpine
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=PRODUCTION_PACKAGE /app/node_modules /app/node_modules
 COPY package.json /app/package.json
